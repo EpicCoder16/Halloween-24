@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Play Slither.io</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { background: #111; color: #fff; font-family: 'Poppins', sans-serif; display:flex; flex-direction:column; align-items:center; }
+    .container { max-width: 1200px; width: 100%; margin: 24px; }
+    .frame-wrap { position: relative; padding-top: 56.25%; /* 16:9 */ }
+    iframe { position: absolute; top:0; left:0; width:100%; height:100%; border:0; }
+    .notice { margin: 12px 0; color: #e1891c; }
+    .btn { background:#e1891c; color:#222; padding:10px 16px; border:none; border-radius:8px; text-decoration:none; }
+  </style>
+</head>
+<body>
+<script>
+  // Simple password gate
+  (function() {
+    const correct = 'playtime';
+    const attempt = prompt('Enter password to play Slither:');
+    if (attempt === null) {
+      window.location.href = 'index.html';
+      return;
+    }
+    if (attempt !== correct) {
+      alert('Wrong password. Redirecting to home.');
+      window.location.href = 'index.html';
+      return;
+    }
+  })();
+</script>
+  <div class="container">
+    <h2 style="text-align:center;">Slither.io</h2>
+    <p class="notice">If the game does not load in the box below, click the button to open it in a new tab.</p>
+    <div class="frame-wrap" id="frameWrap">
+      <!-- Attempt to embed; many sites disallow embedding. -->
+      <iframe id="gameFrame" src="https://slither.io/" title="Slither.io"></iframe>
+    </div>
+    <div style="text-align:center; margin-top:12px;">
+      <a class="btn" id="openBtn" href="https://slither.io/" target="_blank" rel="noopener">Open Slither.io in new tab</a>
+      <a class="btn" href="index.html" style="margin-left:12px;">Back to Home</a>
+    </div>
+  </div>
+  <script>
+    // If iframe blocked due to X-Frame-Options, replace with a friendly message and keep the open button.
+    const iframe = document.getElementById('gameFrame');
+    iframe.addEventListener('load', () => {
+      try {
+        // Accessing iframe.contentWindow will throw if blocked
+        const win = iframe.contentWindow;
+        // If accessible, do nothing
+      } catch (e) {
+        const wrap = document.getElementById('frameWrap');
+        wrap.innerHTML = '<div style="padding:40px; background:#222; border-radius:8px; text-align:center;">This site prevents embedding. Use the button below to open Slither in a new tab.</div>';
+      }
+    });
+  </script>
+</body>
+</html>
