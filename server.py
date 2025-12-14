@@ -18,7 +18,7 @@ def chat():
         "Content-Type": "application/json"
     }
     payload = {
-        "model": "deepseek/deepseek-chat-v3.1:free",
+        "model": "openai/gpt-oss-120b:free",
         "messages": [{"role": "user", "content": user_msg}]
     }
     response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload)
