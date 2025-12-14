@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Play Snake</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { background: #222; color: #fff; font-family: 'Poppins', sans-serif; text-align: center; }
+    canvas { background: #111; display: block; margin: 40px auto; border-radius: 10px; box-shadow: 0 0 20px #e1891c; }
+    .score { font-size: 1.5rem; margin-top: 10px; }
+    .back-link { color: #e1891c; text-decoration: underline; margin-top: 16px; display: block; }
+    .controls { margin-top: 20px; margin-bottom: 10px; }
+    .controls label { margin: 0 10px; font-size: 1.1rem; }
+    .controls select { font-size: 1rem; padding: 4px 8px; border-radius: 6px; border: none; }
+  </style>
+</head>
+<body>
+  <h2>Snake Game</h2>
+  <div class="controls">
+    <label>Grid Size:
+      <select id="grid-size">
+        <option value="small">Small</option>
+        <option value="normal" selected>Normal</option>
+        <option value="large">Large</option>
+      </select>
+    </label>
+    <label>Speed:
+      <select id="speed">
+        <option value="slow">Slow</option>
+        <option value="normal" selected>Normal</option>
+        <option value="fast">Fast</option>
+      </select>
+    </label>
+    <label>Fruit:
+      <select id="fruit-count">
+        <option value="1" selected>1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+        <option value="6">6</option>
+        <option value="7">7</option>
+        <option value="8">8</option>
+        <option value="9">9</option>
+        <option value="10">10</option>
+      </select>
+    </label>
+    <button id="apply-settings">Apply</button>
+  </div>
+  <div class="score" id="score">Score: 0</div>
+  <canvas id="game" width="400" height="400"></canvas>
+  <a href="index.html" class="back-link">Back to Home</a>
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const gridSizeSelect = document.getElementById('grid-size');
+    const speedSelect = document.getElementById('speed');
+    const applyBtn = document.getElementById('apply-settings');
+    const fruitCountSelect = document.getElementById('fruit-count');
+    let box, gridCount, speed, intervalMs, fruitCount;
+    let snake, direction, score, gameInterval, fruits;
+
+    // Settings presets
+    const gridPresets = {
+      small: { box: 30, grid: 12 },
+      normal: { box: 30, grid: 16 },
+      large: { box: 30, grid: 20 }
+    };
+    const speedPresets = {
+      slow: 160,
+      normal: 100,
+      fast: 60
+    };
+
+    function applySettings() {
+      const grid = gridPresets[gridSizeSelect.value];
+      box = grid.box;
+      gridCount = grid.grid;
+      canvas.width = box * gridCount;
+      canvas.height = box * gridCount;
+      intervalMs = speedPresets[speedSelect.value];
+      fruitCount = parseInt(fruitCountSelect.value);
+      startGame();
+    }
+
+    applyBtn.onclick = applySettings;
+
+    document.addEventListener('keydown', dir);
+    function dir(e) {
+      if (e.key === 'ArrowLeft') {
+        if (direction !== 'RIGHT' && direction !== 'LEFT') direction = 'LEFT';
+      } else if (e.key === 'ArrowUp') {
+        if (direction !== 'DOWN' && direction !== 'UP') direction = 'UP';
+      } else if (e.key === 'ArrowRight') {
+        if (direction !== 'LEFT' && direction !== 'RIGHT') direction = 'RIGHT';
+      } else if (e.key === 'ArrowDown') {
+        if (direction !== 'UP' && direction !== 'DOWN') direction = 'DOWN';
+      }
+    }
+
+    function collision(head, arr) {
+      for (let i = 0; i < arr.length; i++) {
+        if (head.x === arr[i].x && head.y === arr[i].y) return true;
+      }
+      return false;
+    }
+
+    function drawSnakeSegment(x, y, isHead, isTail, prev, next) {
+      ctx.save();
+      ctx.translate(x + box/2, y + box/2);
+      // Head: gradient, rounded
+      if (isHead) {
+        const grad = ctx.createRadialGradient(0, 0, box*0.1, 0, 0, box*0.5);
+        grad.addColorStop(0, '#ffe0a3');
+        grad.addColorStop(0.5, '#e1891c');
+        grad.addColorStop(1, '#b85c00');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(0, 0, box/2, 0, 2*Math.PI);
+        ctx.fill();
+        // Eyes
+        ctx.fillStyle = '#222';
+        let eyeOffsetX = 0, eyeOffsetY = 0;
+        if (direction === 'LEFT') eyeOffsetX = -box*0.18;
+        if (direction === 'RIGHT') eyeOffsetX = box*0.18;
+        if (direction === 'UP') eyeOffsetY = -box*0.18;
+        if (direction === 'DOWN') eyeOffsetY = box*0.18;
+        ctx.beginPath();
+        ctx.arc(eyeOffsetX-4, eyeOffsetY-4, box*0.08, 0, 2*Math.PI);
+        ctx.arc(eyeOffsetX+4, eyeOffsetY-4, box*0.08, 0, 2*Math.PI);
+        ctx.fill();
+      } else {
+        // Body: rounded rectangle
+        ctx.fillStyle = '#e1891c';
+        ctx.beginPath();
+        ctx.arc(0, 0, box/2.2, 0, 2*Math.PI);
+        ctx.fill();
+        ctx.fillStyle = '#fff2c7';
+        ctx.globalAlpha = 0.18;
+        ctx.beginPath();
+        ctx.arc(0, 0, box/2.5, 0, 2*Math.PI);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+      ctx.restore();
+    }
+
+    function drawCheckerboard() {
+      for (let y = 0; y < gridCount; y++) {
+        for (let x = 0; x < gridCount; x++) {
+          ctx.fillStyle = (x + y) % 2 === 0 ? '#181818' : '#232323';
+          ctx.fillRect(x * box, y * box, box, box);
+        }
+      }
+    }
+
+    function placeFruits() {
+      fruits = [];
+      while (fruits.length < fruitCount) {
+        let newFruit = {
+          x: Math.floor(Math.random() * gridCount) * box,
+          y: Math.floor(Math.random() * gridCount) * box
+        };
+        // Don't place on snake or on another fruit
+        if (!snake.some(seg => seg.x === newFruit.x && seg.y === newFruit.y) &&
+            !fruits.some(f => f.x === newFruit.x && f.y === newFruit.y)) {
+          fruits.push(newFruit);
+        }
+      }
+    }
+
+    function draw() {
+      drawCheckerboard();
+      for (let i = 0; i < snake.length; i++) {
+        drawSnakeSegment(snake[i].x, snake[i].y, i === 0, i === snake.length-1, snake[i-1], snake[i+1]);
+      }
+      // Draw all fruits
+      for (let i = 0; i < fruits.length; i++) {
+        ctx.save();
+        ctx.translate(fruits[i].x + box/2, fruits[i].y + box/2);
+        ctx.fillStyle = '#e74c3c';
+        ctx.beginPath();
+        ctx.arc(0, 0, box/2.3, 0, 2*Math.PI);
+        ctx.fill();
+        // Apple stem
+        ctx.strokeStyle = '#2ecc40';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, -box/2.3);
+        ctx.lineTo(0, -box/1.7);
+        ctx.stroke();
+        ctx.restore();
+      }
+      let snakeX = snake[0].x;
+      let snakeY = snake[0].y;
+      if (direction === 'LEFT') snakeX -= box;
+      if (direction === 'UP') snakeY -= box;
+      if (direction === 'RIGHT') snakeX += box;
+      if (direction === 'DOWN') snakeY += box;
+      // Check if snake eats any fruit
+      let ateFruit = false;
+      for (let i = 0; i < fruits.length; i++) {
+        if (snakeX === fruits[i].x && snakeY === fruits[i].y) {
+          score++;
+          document.getElementById('score').textContent = 'Score: ' + score;
+          // Remove eaten fruit and place a new one
+          fruits.splice(i, 1);
+          // Place a new fruit (not on snake or other fruit)
+          let placed = false;
+          while (!placed) {
+            let newFruit = {
+              x: Math.floor(Math.random() * gridCount) * box,
+              y: Math.floor(Math.random() * gridCount) * box
+            };
+            if (!snake.some(seg => seg.x === newFruit.x && seg.y === newFruit.y) &&
+                !fruits.some(f => f.x === newFruit.x && f.y === newFruit.y)) {
+              fruits.push(newFruit);
+              placed = true;
+            }
+          }
+          ateFruit = true;
+          break;
+        }
+      }
+      if (!ateFruit) {
+        snake.pop();
+      }
+      let newHead = { x: snakeX, y: snakeY };
+      if (
+        snakeX < 0 || snakeX >= box*gridCount ||
+        snakeY < 0 || snakeY >= box*gridCount ||
+        collision(newHead, snake)
+      ) {
+        clearInterval(gameInterval);
+        ctx.fillStyle = '#fff';
+        ctx.font = '2rem Poppins, sans-serif';
+        ctx.fillText('Game Over', canvas.width/2-90, canvas.height/2);
+        return;
+      }
+      snake.unshift(newHead);
+    }
+
+    // Allow Enter key to start a new game
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        startGame();
+      }
+    });
+
+    function startGame() {
+      direction = null;
+      snake = [{ x: Math.floor(gridCount/2) * box, y: Math.floor(gridCount/2) * box }];
+      score = 0;
+      document.getElementById('score').textContent = 'Score: 0';
+      placeFruits();
+      clearInterval(gameInterval);
+      gameInterval = setInterval(draw, intervalMs);
+    }
+    // Default settings
+    gridSizeSelect.value = 'normal';
+    speedSelect.value = 'normal';
+    fruitCountSelect.value = '1';
+    applySettings();
+    canvas.addEventListener('click', startGame);
+  </script>
+</body>
+</html>
